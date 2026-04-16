@@ -86,6 +86,7 @@ curl -X POST http://localhost:8080/api/v1/sensors/TEMP-001/readings \
 ### Delete a room
 
 curl -X DELETE http://localhost:8080/api/v1/rooms/LIB-301
+
 ---
 ## Additional Features
 The following enhancements were implemented:
