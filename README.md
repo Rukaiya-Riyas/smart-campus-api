@@ -26,9 +26,12 @@ Request/response logging
 
 ### Steps
 
-1. Clone the repository: https://github.com/Rukaiya-Riyas/smart-campus-api.git
+1. Clone the repository:
+```bash
+git clone https://github.com/Rukaiya-Riyas/smart-campus-api.git
 
-2. Navigate into the project: cd smart-campus-api
+2. Navigate into the project: 
+cd smart-campus-api
 
 3. Build the project: 
 mvn clean package
@@ -36,38 +39,54 @@ mvn clean package
 4. Run the server:
 java -jar target/smart-campus-api-1.0-SNAPSHOT.jar
 
-5. The API will be available at:(Press ENTER to stop) 
+5.Access the API:
 http://localhost:8080/api/v1
+
+Press ENTER in the terminal to stop the server.
 
 ## API Endpoints
 
-Resource	Endpoint
-Discovery	 GET /api/v1
-Rooms	         /api/v1/rooms
-Sensors	         /api/v1/sensors
-Sensor Readings	 /api/v1/sensors/{sensorId}/readings
+| Resource         | Endpoint |
+|----------------|----------|
+| Discovery       | /api/v1 |
+| Rooms           | /api/v1/rooms |
+| Sensors         | /api/v1/sensors |
+| Sensor Readings | /api/v1/sensors/{sensorId}/readings |
 
 ## Sample curl Commands
 
-### - Get API info
+### Get API info
+```bash
 curl -X GET http://localhost:8080/api/v1
 
-### - Get all rooms
+### Get all rooms
+
 curl -X GET http://localhost:8080/api/v1/rooms
 
-### - Create a room
-curl -X POST http://localhost:8080/api/v1/rooms 
--H "Content-Type: application/json" 
+### Create a room
+
+curl -X POST http://localhost:8080/api/v1/rooms \
+-H "Content-Type: application/json" \
 -d '{"id":"CS-205","name":"Computer Science Lab","capacity":40}'
+### Get all sensors
 
-### - Filter sensors by type
+curl -X GET http://localhost:8080/api/v1/sensors
+### Filter sensors by type
+
 curl -X GET "http://localhost:8080/api/v1/sensors?type=CO2"
+### Get sensor readings
 
-### - Post a sensor reading
-curl -X POST http://localhost:8080/api/v1/sensors/TEMP-001/readings 
--H "Content-Type: application/json" 
+curl -X GET http://localhost:8080/api/v1/sensors/TEMP-001/readings
+### Post a sensor reading
+
+
+curl -X POST http://localhost:8080/api/v1/sensors/TEMP-001/readings \
+-H "Content-Type: application/json" \
 -d '{"value":23.5}'
+### Delete a room
 
+curl -X DELETE http://localhost:8080/api/v1/rooms/LIB-301
+---
 ## Additional Features
 The following enhancements were implemented:
 
