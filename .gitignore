@@ -1,2 +1,19 @@
+# Maven build output
 target/
+*.class
+
+# NetBeans IDE files
+nbproject/private/
+nbbuild/
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Maven shaded build artifact
 dependency-reduced-pom.xml
