@@ -27,7 +27,7 @@ Request/response logging
 ### Steps
 
 1. Clone the repository:
-```bash
+
 git clone https://github.com/Rukaiya-Riyas/smart-campus-api.git
 
 2. Navigate into the project: 
@@ -46,17 +46,17 @@ Press ENTER in the terminal to stop the server.
 
 ## API Endpoints
 
-| Resource         | Endpoint |
-|----------------|----------|
-| Discovery       | /api/v1 |
-| Rooms           | /api/v1/rooms |
-| Sensors         | /api/v1/sensors |
-| Sensor Readings | /api/v1/sensors/{sensorId}/readings |
+| Resource         | Endpoint                            |
+|----------------  |-------------------------------------|
+| Discovery        | /api/v1                             |
+| Rooms            | /api/v1/rooms                       |
+| Sensors          | /api/v1/sensors                     |
+| Sensor Readings  | /api/v1/sensors/{sensorId}/readings |
 
 ## Sample curl Commands
 
 ### Get API info
-```bash
+
 curl -X GET http://localhost:8080/api/v1
 
 ### Get all rooms
