@@ -49,27 +49,27 @@ Sensor Readings	 /api/v1/sensors/{sensorId}/readings
 
 ## Sample curl Commands
 
-### Get API info
+### - Get API info
 curl -X GET http://localhost:8080/api/v1
 
-### Get all rooms
+### - Get all rooms
 curl -X GET http://localhost:8080/api/v1/rooms
 
-### Create a room
+### - Create a room
 curl -X POST http://localhost:8080/api/v1/rooms 
 -H "Content-Type: application/json" 
 -d '{"id":"CS-205","name":"Computer Science Lab","capacity":40}'
 
-### Filter sensors by type
+### - Filter sensors by type
 curl -X GET "http://localhost:8080/api/v1/sensors?type=CO2"
 
-### Post a sensor reading
+### - Post a sensor reading
 curl -X POST http://localhost:8080/api/v1/sensors/TEMP-001/readings 
 -H "Content-Type: application/json" 
 -d '{"value":23.5}'
 
 ## Additional Features
-the following enhancements were implemented:
+The following enhancements were implemented:
 
 ### Input Validation
 Rooms validated for non-empty name and capacity > 0
@@ -109,7 +109,9 @@ Metadata
 System uptime
 
 ### Thread-Safe Data Storage
+
 Uses ConcurrentHashMap for safe concurrent operations
+
 ---
 
 # Report
