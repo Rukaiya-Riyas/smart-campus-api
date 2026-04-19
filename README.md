@@ -2,7 +2,7 @@
  
 > **Technology Stack:** Java 11 · JAX-RS (Jersey 2.41) · Grizzly Embedded HTTP Server · Maven
 
-A robust RESTful API for managing Rooms and Sensors across a university Smart Campus. Built entirely with JAX-RS — no Spring Boot, no external database.
+A robust RESTful API for managing Rooms and Sensors across a university Smart Campus. Built entirely with JAX-RS
 
 ---
 
@@ -16,7 +16,7 @@ A robust RESTful API for managing Rooms and Sensors across a university Smart Ca
 - [Sample curl Commands](#sample-curl-commands)
 - [Error Handling](#error-handling)
 - [Extra Features Beyond Specification](#extra-features-beyond-specification)
-- [Conceptual Report — Question Answers](#conceptual-report--question-answers)
+- [Conceptual Report](#conceptual-report--question-answers)
 
 ---
 
@@ -41,7 +41,7 @@ The Smart Campus API provides a seamless interface for facilities managers and a
 
 ```
 /api/v1
-├── /                           Discovery — HATEOAS metadata, uptime, live stats
+├── /                           Discovery - HATEOAS metadata, uptime, live stats
 ├── /rooms
 │   ├── GET                     List all rooms
 │   ├── POST                    Create room → 201 + Location header
@@ -61,7 +61,7 @@ The Smart Campus API provides a seamless interface for facilities managers and a
 
 ### Thread Safety
 
-All data lives in static `ConcurrentHashMap` fields in the shared `DataStore` class. JAX-RS resource classes are **request-scoped** by default — a new instance is created for each incoming HTTP request. Because all mutable state is centralised in `DataStore` and backed by `ConcurrentHashMap`, concurrent requests read and write safely without race conditions.
+All data lives in static `ConcurrentHashMap` fields in the shared `DataStore` class. JAX-RS resource classes are **request-scoped** by default, a new instance is created for each incoming HTTP request. Because all mutable state is centralised in `DataStore` and backed by `ConcurrentHashMap`, concurrent requests read and write safely without race conditions.
 
 ### Consistent Error Model
 
@@ -71,7 +71,7 @@ Every error returns the same `ErrorResponse` structure:
 {
   "status": 409,
   "error": "Conflict",
-  "message": "Cannot delete room 'LIB-301' — it still has 1 sensor(s) assigned. Remove all sensors first.",
+  "message": "Cannot delete room 'LIB-301' - it still has 1 sensor(s) assigned. Remove all sensors first.",
   "timestamp": 1713200000000
 }
 ```
@@ -125,14 +125,14 @@ src/main/java/com/smartcampus/
 | Apache Maven | 3.6+ |
 | NetBeans IDE | 12+ (recommended) |
 
-### Step 1 — Clone the repository
+### Step 1 - Clone the repository
 
 ```bash
 git clone https://github.com/Rukaiya-Riyas/smart-campus-api.git
 cd smart-campus-api
 ```
 
-### Step 2 — Build the shaded JAR
+### Step 2 - Build the shaded JAR
 
 ```bash
 mvn clean package
@@ -144,7 +144,7 @@ This produces a self-contained fat JAR at:
 target/smart-campus-api-1.0-SNAPSHOT-shaded.jar
 ```
 
-### Step 3 — Start the server
+### Step 3 - Start the server
 
 ```bash
 java -jar target/smart-campus-api-1.0-SNAPSHOT-shaded.jar
@@ -160,7 +160,7 @@ Expected console output:
 Press ENTER to stop the server...
 ```
 
-### Step 4 — Verify
+### Step 4 - Verify
 
 ```bash
 curl http://localhost:8080/api/v1
@@ -184,23 +184,23 @@ All request bodies: `Content-Type: application/json`
 
 | Method | Path | Description | Status |
 |--------|------|-------------|--------|
-| GET | `/` | HATEOAS discovery — version, contact, uptime, live counts, `_links` | 200 |
+| GET | `/` | HATEOAS discovery - version, contact, uptime, live counts, `_links` | 200 |
 
 ### Rooms
 
 | Method | Path | Description | Success |
 |--------|------|-------------|---------|
 | GET | `/rooms` | List all rooms | 200 |
-| POST | `/rooms` | Create room — `id`, `name`, `capacity > 0` required | 201 + Location |
+| POST | `/rooms` | Create room - `id`, `name`, `capacity > 0` required | 201 + Location |
 | GET | `/rooms/{roomId}` | Get room by ID | 200 |
-| DELETE | `/rooms/{roomId}` | Delete room — blocked if sensors assigned | 204 |
+| DELETE | `/rooms/{roomId}` | Delete room - blocked if sensors assigned | 204 |
 
 ### Sensors
 
 | Method | Path | Description | Success |
 |--------|------|-------------|---------|
-| GET | `/sensors` | List sensors — optional `?type=` and/or `?status=` (case-insensitive) | 200 |
-| POST | `/sensors` | Register sensor — validates `roomId` exists | 201 + Location |
+| GET | `/sensors` | List sensors - optional `?type=` and/or `?status=` (case-insensitive) | 200 |
+| POST | `/sensors` | Register sensor - validates `roomId` exists | 201 + Location |
 | GET | `/sensors/{sensorId}` | Get sensor by ID | 200 |
 | PUT | `/sensors/{sensorId}` | Update sensor status or type | 200 |
 
@@ -209,19 +209,19 @@ All request bodies: `Content-Type: application/json`
 | Method | Path | Description | Success |
 |--------|------|-------------|---------|
 | GET | `/sensors/{sensorId}/readings` | Full reading history | 200 |
-| POST | `/sensors/{sensorId}/readings` | Add reading — updates parent `currentValue` | 201 |
+| POST | `/sensors/{sensorId}/readings` | Add reading - updates parent `currentValue` | 201 |
 
 ---
 
 ## Sample curl Commands
 
-### 1 — Discover the API
+### 1 - Discover the API
 
 ```bash
 curl -X GET http://localhost:8080/api/v1
 ```
 
-### 2 — Create a Room
+### 2 - Create a Room
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/rooms \
@@ -229,13 +229,13 @@ curl -X POST http://localhost:8080/api/v1/rooms \
   -d '{"id":"CS-202","name":"Computer Science Lab","capacity":35}'
 ```
 
-### 3 — List all Rooms
+### 3 - List all Rooms
 
 ```bash
 curl -X GET http://localhost:8080/api/v1/rooms
 ```
 
-### 4 — Register a Sensor
+### 4 - Register a Sensor
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/sensors \
@@ -243,19 +243,19 @@ curl -X POST http://localhost:8080/api/v1/sensors \
   -d '{"id":"CO2-007","type":"CO2","status":"ACTIVE","currentValue":0.0,"roomId":"LIB-301"}'
 ```
 
-### 5 — Filter Sensors by type
+### 5 - Filter Sensors by type
 
 ```bash
 curl -X GET "http://localhost:8080/api/v1/sensors?type=temperature"
 ```
 
-### 6 — Filter Sensors by status (bonus)
+### 6 - Filter Sensors by status
 
 ```bash
 curl -X GET "http://localhost:8080/api/v1/sensors?status=ACTIVE"
 ```
 
-### 7 — Post a Sensor Reading
+### 7 - Post a Sensor Reading
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/sensors/TEMP-001/readings \
@@ -263,19 +263,19 @@ curl -X POST http://localhost:8080/api/v1/sensors/TEMP-001/readings \
   -d '{"value":24.3}'
 ```
 
-### 8 — Get Reading History
+### 8 - Get Reading History
 
 ```bash
 curl -X GET http://localhost:8080/api/v1/sensors/TEMP-001/readings
 ```
 
-### 9 — Attempt to delete Room with active Sensors → 409
+### 9 - Attempt to delete Room with active Sensors → 409
 
 ```bash
 curl -X DELETE http://localhost:8080/api/v1/rooms/LIB-301
 ```
 
-### 10 — Register Sensor with bad roomId → 422
+### 10 - Register Sensor with bad roomId → 422
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/sensors \
@@ -297,7 +297,7 @@ curl -X POST http://localhost:8080/api/v1/sensors \
 | POST reading to MAINTENANCE sensor | 403 Forbidden |
 | Any unexpected server error | 500 Internal Server Error |
 
-All errors return a consistent JSON body — **no raw Java stack traces are ever exposed to the client**.
+All errors return a consistent JSON body - **no raw Java stack traces are ever exposed to the client**.
 
 ---
 
@@ -307,7 +307,7 @@ All errors return a consistent JSON body — **no raw Java stack traces are ever
 |---------|-------------|
 | **`ErrorResponse` model** | All exception mappers use a shared POJO with `status`, `error`, `message`, `timestamp` |
 | **`201 Created` + Location header** | POST /rooms and POST /sensors both return a `Location` header pointing to the new resource |
-| **`204 No Content` on DELETE** | Correct REST semantics — no body on successful deletion |
+| **`204 No Content` on DELETE** | Correct REST semantics - no body on successful deletion |
 | **Input validation on POST** | Rooms: validates `id`, `name`, `capacity > 0`. Sensors: validates `id`, `type`, `roomId` |
 | **Dual filter on GET /sensors** | Supports `?type=` and `?status=` together or separately, both case-insensitive |
 | **Response-time logging** | Filter records start time on request and logs elapsed milliseconds on response |

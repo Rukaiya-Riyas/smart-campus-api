@@ -16,7 +16,7 @@ public class RoomNotEmptyExceptionMapper implements ExceptionMapper<RoomNotEmpty
         return Response.status(409)
                 .type(MediaType.APPLICATION_JSON)
                 .entity(new ErrorResponse(409, "Conflict",
-                        "Cannot delete room '" + e.getRoomId() + "' — it still has " + e.getSensorCount() + " sensor(s) assigned. Remove all sensors first."))
+                        "Cannot delete room '" + e.getRoomId() + "' , it still has " + e.getSensorCount() + " sensor(s) assigned. Remove all sensors first."))
                 .build();
     }
 }

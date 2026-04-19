@@ -102,7 +102,7 @@ public class SensorResource {
         return Response.ok(sensor).build();
     }
 
-    // Sub-resource locator — delegates reading management to SensorReadingResource
+    // Sub-resource locator - delegates reading management to SensorReadingResource
     @Path("/{sensorId}/readings")
     public SensorReadingResource getReadingResource(@PathParam("sensorId") String sensorId) {
         return new SensorReadingResource(sensorId);
