@@ -8,8 +8,6 @@ import com.smartcampus.model.Sensor;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriBuilder;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -22,7 +20,7 @@ public class SensorResource {
     // GET /api/v1/sensors
     // GET /api/v1/sensors?type=CO2
     // GET /api/v1/sensors?status=ACTIVE
-    // GET /api/v1/sensors?type=CO2&status=ACTIVE  (combined filter)
+    // GET /api/v1/sensors?type=CO2&status=ACTIVE
     @GET
     public Response getAllSensors(
             @QueryParam("type") String type,
@@ -30,20 +28,16 @@ public class SensorResource {
 
         List<Sensor> result = new ArrayList<>(DataStore.sensors.values());
 
-        // Case-insensitive type filtering
         if (type != null && !type.isBlank()) {
             result = result.stream()
                     .filter(s -> s.getType().equalsIgnoreCase(type))
                     .collect(Collectors.toList());
         }
-
-        // Case-insensitive status filtering (bonus: not required, but impressive)
         if (status != null && !status.isBlank()) {
             result = result.stream()
                     .filter(s -> s.getStatus().equalsIgnoreCase(status))
                     .collect(Collectors.toList());
         }
-
         return Response.ok(result).build();
     }
 
@@ -53,9 +47,8 @@ public class SensorResource {
     public Response getSensorById(@PathParam("sensorId") String sensorId) {
         Sensor sensor = DataStore.sensors.get(sensorId);
         if (sensor == null) {
-            return Response.status(Response.Status.NOT_FOUND)
-                    .entity(new ErrorResponse(404, "Not Found",
-                            "Sensor with ID '" + sensorId + "' does not exist."))
+            return Response.status(404)
+                    .entity(new ErrorResponse(404, "Not Found", "Sensor '" + sensorId + "' does not exist"))
                     .build();
         }
         return Response.ok(sensor).build();
@@ -64,43 +57,52 @@ public class SensorResource {
     // POST /api/v1/sensors
     @POST
     public Response createSensor(Sensor sensor) {
-        // Input validation first
-        if (sensor == null || sensor.getId() == null || sensor.getId().isBlank()) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(new ErrorResponse(400, "Bad Request", "Sensor 'id' field is required."))
+        if (sensor.getId() == null || sensor.getId().isBlank()) {
+            return Response.status(400)
+                    .entity(new ErrorResponse(400, "Bad Request", "Sensor ID is required"))
                     .build();
         }
-        if (sensor.getType() == null || sensor.getType().isBlank()) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(new ErrorResponse(400, "Bad Request", "Sensor 'type' field is required."))
-                    .build();
-        }
-        // Validate that the referenced roomId exists — 422 Unprocessable Entity
         if (sensor.getRoomId() == null || !DataStore.rooms.containsKey(sensor.getRoomId())) {
             throw new LinkedResourceNotFoundException(sensor.getRoomId());
         }
         if (DataStore.sensors.containsKey(sensor.getId())) {
-            return Response.status(Response.Status.CONFLICT)
-                    .entity(new ErrorResponse(409, "Conflict",
-                            "A sensor with ID '" + sensor.getId() + "' already exists."))
+            return Response.status(409)
+                    .entity(new ErrorResponse(409, "Conflict", "Sensor '" + sensor.getId() + "' already exists"))
                     .build();
         }
-        // Default status if not provided
         if (sensor.getStatus() == null || sensor.getStatus().isBlank()) {
             sensor.setStatus("ACTIVE");
         }
-
-        // Register sensor and link to its room
         DataStore.sensors.put(sensor.getId(), sensor);
         DataStore.rooms.get(sensor.getRoomId()).getSensorIds().add(sensor.getId());
         DataStore.readings.put(sensor.getId(), new ArrayList<>());
-
-        // 201 Created with Location header
-        URI location = UriBuilder.fromPath("/api/v1/sensors/{id}").build(sensor.getId());
-        return Response.created(location).entity(sensor).build();
+        return Response.status(201)
+                .header("Location", "/api/v1/sensors/" + sensor.getId())
+                .entity(sensor)
+                .build();
     }
 
-    // Sub-resource locator — delegates to SensorReadingResource
+    // PUT /api/v1/sensors/{sensorId}
+    // Allows updating a sensor's status or roomId (e.g. change from MAINTENANCE back to ACTIVE)
+    @PUT
+    @Path("/{sensorId}")
+    public Response updateSensor(@PathParam("sensorId") String sensorId, Sensor updates) {
+        Sensor sensor = DataStore.sensors.get(sensorId);
+        if (sensor == null) {
+            return Response.status(404)
+                    .entity(new ErrorResponse(404, "Not Found", "Sensor '" + sensorId + "' does not exist"))
+                    .build();
+        }
+        if (updates.getStatus() != null && !updates.getStatus().isBlank()) {
+            sensor.setStatus(updates.getStatus());
+        }
+        if (updates.getType() != null && !updates.getType().isBlank()) {
+            sensor.setType(updates.getType());
+        }
+        return Response.ok(sensor).build();
+    }
+
+    // Sub-resource locator — delegates reading management to SensorReadingResource
     @Path("/{sensorId}/readings")
     public SensorReadingResource getReadingResource(@PathParam("sensorId") String sensorId) {
         return new SensorReadingResource(sensorId);

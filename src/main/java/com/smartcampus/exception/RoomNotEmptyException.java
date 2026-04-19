@@ -5,7 +5,7 @@ public class RoomNotEmptyException extends RuntimeException {
     private final int sensorCount;
 
     public RoomNotEmptyException(String roomId, int sensorCount) {
-        super("Room " + roomId + " cannot be deleted: it still has " + sensorCount + " sensor(s) assigned.");
+        super("Room " + roomId + " still has " + sensorCount + " sensor(s) assigned to it");
         this.roomId = roomId;
         this.sensorCount = sensorCount;
     }

@@ -13,15 +13,10 @@ public class SensorUnavailableExceptionMapper implements ExceptionMapper<SensorU
 
     @Override
     public Response toResponse(SensorUnavailableException e) {
-        ErrorResponse error = new ErrorResponse(
-                403,
-                "Forbidden",
-                "Sensor '" + e.getSensorId() + "' is currently under MAINTENANCE and cannot accept new readings. " +
-                        "Update the sensor status to ACTIVE before posting readings."
-        );
         return Response.status(403)
                 .type(MediaType.APPLICATION_JSON)
-                .entity(error)
+                .entity(new ErrorResponse(403, "Forbidden",
+                        "Sensor '" + e.getSensorId() + "' is under MAINTENANCE and cannot accept new readings."))
                 .build();
     }
 }

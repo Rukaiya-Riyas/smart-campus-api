@@ -13,16 +13,10 @@ public class RoomNotEmptyExceptionMapper implements ExceptionMapper<RoomNotEmpty
 
     @Override
     public Response toResponse(RoomNotEmptyException e) {
-        ErrorResponse error = new ErrorResponse(
-                409,
-                "Conflict",
-                "Room '" + e.getRoomId() + "' cannot be deleted — it has " +
-                        e.getSensorCount() + " active sensor(s) still assigned. " +
-                        "Remove or reassign all sensors before decommissioning this room."
-        );
         return Response.status(409)
                 .type(MediaType.APPLICATION_JSON)
-                .entity(error)
+                .entity(new ErrorResponse(409, "Conflict",
+                        "Cannot delete room '" + e.getRoomId() + "' — it still has " + e.getSensorCount() + " sensor(s) assigned. Remove all sensors first."))
                 .build();
     }
 }

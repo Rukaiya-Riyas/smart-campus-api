@@ -1,6 +1,7 @@
 package com.smartcampus.resource;
 
 import com.smartcampus.DataStore;
+import com.smartcampus.Main;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -14,9 +15,6 @@ import java.util.Map;
 @Produces(MediaType.APPLICATION_JSON)
 public class DiscoveryResource {
 
-    // Track when the server started
-    private static final long START_TIME = System.currentTimeMillis();
-
     @GET
     public Response discover() {
         Map<String, Object> info = new LinkedHashMap<>();
@@ -25,21 +23,32 @@ public class DiscoveryResource {
         info.put("status", "UP");
         info.put("contact", "admin@smartcampus.ac.uk");
         info.put("timestamp", System.currentTimeMillis());
-        info.put("uptimeMs", System.currentTimeMillis() - START_TIME);
+        info.put("uptimeMs", System.currentTimeMillis() - Main.START_TIME);
 
-        // Statistics snapshot
-        Map<String, Object> stats = new LinkedHashMap<>();
+        // Live statistics
+        Map<String, Integer> stats = new LinkedHashMap<>();
         stats.put("totalRooms", DataStore.rooms.size());
         stats.put("totalSensors", DataStore.sensors.size());
         info.put("stats", stats);
 
-        // HATEOAS-style resource links
+        // HATEOAS-style navigable links
+        Map<String, Object> roomLink = new LinkedHashMap<>();
+        roomLink.put("href", "/api/v1/rooms");
+        roomLink.put("method", "GET");
+
+        Map<String, Object> sensorLink = new LinkedHashMap<>();
+        sensorLink.put("href", "/api/v1/sensors");
+        sensorLink.put("method", "GET");
+
+        Map<String, Object> filterLink = new LinkedHashMap<>();
+        filterLink.put("href", "/api/v1/sensors?type={type}&status={status}");
+        filterLink.put("method", "GET");
+
         Map<String, Object> links = new LinkedHashMap<>();
-        links.put("self",    Map.of("href", "/api/v1",             "method", "GET"));
-        links.put("ro"
-                + "oms",   Map.of("href", "/api/v1/rooms",       "method", "GET"));
-        links.put("sensors", Map.of("href", "/api/v1/sensors",     "method", "GET"));
-        links.put("filteredSensors", Map.of("href", "/api/v1/sensors?type={type}", "method", "GET"));
+        links.put("self",    Map.of("href", "/api/v1", "method", "GET"));
+        links.put("rooms",   roomLink);
+        links.put("sensors", sensorLink);
+        links.put("filteredSensors", filterLink);
         info.put("_links", links);
 
         return Response.ok(info).build();

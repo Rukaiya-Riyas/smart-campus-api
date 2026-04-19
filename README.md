@@ -1,324 +1,437 @@
 # Smart Campus API
+ 
+> **Technology Stack:** Java 11 · JAX-RS (Jersey 2.41) · Grizzly Embedded HTTP Server · Maven
+
+A robust RESTful API for managing Rooms and Sensors across a university Smart Campus. Built entirely with JAX-RS — no Spring Boot, no external database.
+
+---
+
+## 📋 Table of Contents
+
+- [Overview](#overview)
+- [Architecture and Design](#architecture-and-design)
+- [Project Structure](#project-structure)
+- [How to Build and Run](#how-to-build-and-run)
+- [API Endpoints Reference](#api-endpoints-reference)
+- [Sample curl Commands](#sample-curl-commands)
+- [Error Handling](#error-handling)
+- [Extra Features Beyond Specification](#extra-features-beyond-specification)
+- [Conceptual Report — Question Answers](#conceptual-report--question-answers)
+
+---
 
 ## Overview
-A RESTful API built using JAX-RS (Jersey) and the Grizzly HTTP Server for managing university campus rooms and sensors.
 
-The system enables:
+The Smart Campus API provides a seamless interface for facilities managers and automated building systems to interact with room and sensor data. Key features:
 
-Room management (create, retrieve, delete)
-Sensor management and filtering
-Sensor reading history tracking
-Structured error handling
-Request/response logging
+- Full **CRUD** for Rooms and Sensors with correct HTTP semantics (`201`, `204`, `404`, etc.)
+- **Sub-resource locator pattern** for sensor reading history (`/sensors/{id}/readings`)
+- **Consistent `ErrorResponse` JSON model** across every error scenario
+- **HATEOAS-style** discovery endpoint with live stats and server uptime
+- **Request/Response logging filter** with response-time measurement in milliseconds
+- **Thread-safe** in-memory data store using `ConcurrentHashMap`
+- **Input validation** on all POST endpoints
+- **Bonus dual-filter** on GET /sensors supporting `?type=` and `?status=` simultaneously
 
-## Tech Stack
-- Java 11
-- JAX-RS (Jersey 2.41)
-- Grizzly HTTP Server
-- Jackson (JSON)
-- Maven
+---
+
+## Architecture and Design
+
+### Resource Hierarchy
+
+```
+/api/v1
+├── /                           Discovery — HATEOAS metadata, uptime, live stats
+├── /rooms
+│   ├── GET                     List all rooms
+│   ├── POST                    Create room → 201 + Location header
+│   └── /{roomId}
+│       ├── GET                 Get room by ID
+│       └── DELETE              Delete room → 204, blocked if sensors exist → 409
+└── /sensors
+    ├── GET ?type= &status=     List/filter sensors (case-insensitive, combinable)
+    ├── POST                    Register sensor → 201 + Location header
+    ├── PUT /{sensorId}         Update sensor status/type
+    └── /{sensorId}
+        ├── GET                 Get sensor by ID
+        └── /readings
+            ├── GET             Get full reading history
+            └── POST            Add reading → 201, updates parent currentValue
+```
+
+### Thread Safety
+
+All data lives in static `ConcurrentHashMap` fields in the shared `DataStore` class. JAX-RS resource classes are **request-scoped** by default — a new instance is created for each incoming HTTP request. Because all mutable state is centralised in `DataStore` and backed by `ConcurrentHashMap`, concurrent requests read and write safely without race conditions.
+
+### Consistent Error Model
+
+Every error returns the same `ErrorResponse` structure:
+
+```json
+{
+  "status": 409,
+  "error": "Conflict",
+  "message": "Cannot delete room 'LIB-301' — it still has 1 sensor(s) assigned. Remove all sensors first.",
+  "timestamp": 1713200000000
+}
+```
+
+---
+
+## Project Structure
+
+```
+src/main/java/com/smartcampus/
+├── AppConfig.java                         @ApplicationPath("/api/v1") entry point
+├── DataStore.java                         ConcurrentHashMap in-memory store with seed data
+├── Main.java                              Grizzly embedded server bootstrap
+│
+├── model/
+│   ├── Room.java
+│   ├── Sensor.java
+│   ├── SensorReading.java                 UUID id + server-side epoch timestamp
+│   └── ErrorResponse.java                 ★ Extra: unified error body model
+│
+├── resource/
+│   ├── DiscoveryResource.java             HATEOAS discovery with uptime + live stats
+│   ├── RoomResource.java                  Rooms CRUD with Location headers & validation
+│   ├── SensorResource.java                Sensors CRUD + PUT update + dual filters
+│   └── SensorReadingResource.java         Sub-resource: reading history management
+│
+├── exception/
+│   ├── RoomNotEmptyException.java         Carries roomId + sensor count
+│   ├── LinkedResourceNotFoundException.java
+│   └── SensorUnavailableException.java
+│
+├── mapper/
+│   ├── RoomNotEmptyExceptionMapper.java           → 409 Conflict
+│   ├── LinkedResourceNotFoundExceptionMapper.java → 422 Unprocessable Entity
+│   ├── SensorUnavailableExceptionMapper.java      → 403 Forbidden
+│   └── GlobalExceptionMapper.java                → 500 (catch-all, logs full stack server-side)
+│
+└── filter/
+    └── LoggingFilter.java                 ★ Extra: logs method, URI, status, duration(ms)
+```
+
+---
 
 ## How to Build and Run
 
 ### Prerequisites
-- Java 11+
-- Maven 3.6+
 
-### Steps
+| Tool | Version |
+|------|---------|
+| Java JDK | 11 or higher |
+| Apache Maven | 3.6+ |
+| NetBeans IDE | 12+ (recommended) |
 
-1. Clone the repository:
+### Step 1 — Clone the repository
 
+```bash
 git clone https://github.com/Rukaiya-Riyas/smart-campus-api.git
-
-2. Navigate into the project: 
 cd smart-campus-api
+```
 
-3. Build the project: 
+### Step 2 — Build the shaded JAR
+
+```bash
 mvn clean package
+```
 
-4. Run the server:
-java -jar target/smart-campus-api-1.0-SNAPSHOT.jar
+This produces a self-contained fat JAR at:
 
-5.Access the API:
-http://localhost:8080/api/v1
+```
+target/smart-campus-api-1.0-SNAPSHOT-shaded.jar
+```
 
-Press ENTER in the terminal to stop the server.
+### Step 3 — Start the server
 
-## API Endpoints
+```bash
+java -jar target/smart-campus-api-1.0-SNAPSHOT-shaded.jar
+```
 
-| Resource         | Endpoint                            |
-|----------------  |-------------------------------------|
-| Discovery        | /api/v1                             |
-| Rooms            | /api/v1/rooms                       |
-| Sensors          | /api/v1/sensors                     |
-| Sensor Readings  | /api/v1/sensors/{sensorId}/readings |
+Expected console output:
+
+```
+===========================================
+ Smart Campus API is running!
+ URL: http://localhost:8080/api/v1
+===========================================
+Press ENTER to stop the server...
+```
+
+### Step 4 — Verify
+
+```bash
+curl http://localhost:8080/api/v1
+```
+
+### Running inside NetBeans
+
+1. **File → Open Project** → select the `smart-campus-api` folder
+2. Right-click the project → **Clean and Build**
+3. Right-click `Main.java` → **Run File**
+4. The Output tab shows the server start message
+
+---
+
+## API Endpoints Reference
+
+**Base URL:** `http://localhost:8080/api/v1`  
+All request bodies: `Content-Type: application/json`
+
+### Discovery
+
+| Method | Path | Description | Status |
+|--------|------|-------------|--------|
+| GET | `/` | HATEOAS discovery — version, contact, uptime, live counts, `_links` | 200 |
+
+### Rooms
+
+| Method | Path | Description | Success |
+|--------|------|-------------|---------|
+| GET | `/rooms` | List all rooms | 200 |
+| POST | `/rooms` | Create room — `id`, `name`, `capacity > 0` required | 201 + Location |
+| GET | `/rooms/{roomId}` | Get room by ID | 200 |
+| DELETE | `/rooms/{roomId}` | Delete room — blocked if sensors assigned | 204 |
+
+### Sensors
+
+| Method | Path | Description | Success |
+|--------|------|-------------|---------|
+| GET | `/sensors` | List sensors — optional `?type=` and/or `?status=` (case-insensitive) | 200 |
+| POST | `/sensors` | Register sensor — validates `roomId` exists | 201 + Location |
+| GET | `/sensors/{sensorId}` | Get sensor by ID | 200 |
+| PUT | `/sensors/{sensorId}` | Update sensor status or type | 200 |
+
+### Sensor Readings
+
+| Method | Path | Description | Success |
+|--------|------|-------------|---------|
+| GET | `/sensors/{sensorId}/readings` | Full reading history | 200 |
+| POST | `/sensors/{sensorId}/readings` | Add reading — updates parent `currentValue` | 201 |
+
+---
 
 ## Sample curl Commands
 
-### Get API info
+### 1 — Discover the API
 
+```bash
 curl -X GET http://localhost:8080/api/v1
+```
 
-### Get all rooms
+### 2 — Create a Room
 
-curl -X GET http://localhost:8080/api/v1/rooms
-
-### Create a room
-
+```bash
 curl -X POST http://localhost:8080/api/v1/rooms \
--H "Content-Type: application/json" \
--d '{"id":"CS-205","name":"Computer Science Lab","capacity":40}'
-### Get all sensors
+  -H "Content-Type: application/json" \
+  -d '{"id":"CS-202","name":"Computer Science Lab","capacity":35}'
+```
 
-curl -X GET http://localhost:8080/api/v1/sensors
-### Filter sensors by type
+### 3 — List all Rooms
 
-curl -X GET "http://localhost:8080/api/v1/sensors?type=CO2"
-### Get sensor readings
+```bash
+curl -X GET http://localhost:8080/api/v1/rooms
+```
 
-curl -X GET http://localhost:8080/api/v1/sensors/TEMP-001/readings
-### Post a sensor reading
+### 4 — Register a Sensor
 
+```bash
+curl -X POST http://localhost:8080/api/v1/sensors \
+  -H "Content-Type: application/json" \
+  -d '{"id":"CO2-007","type":"CO2","status":"ACTIVE","currentValue":0.0,"roomId":"LIB-301"}'
+```
 
+### 5 — Filter Sensors by type
+
+```bash
+curl -X GET "http://localhost:8080/api/v1/sensors?type=temperature"
+```
+
+### 6 — Filter Sensors by status (bonus)
+
+```bash
+curl -X GET "http://localhost:8080/api/v1/sensors?status=ACTIVE"
+```
+
+### 7 — Post a Sensor Reading
+
+```bash
 curl -X POST http://localhost:8080/api/v1/sensors/TEMP-001/readings \
--H "Content-Type: application/json" \
--d '{"value":23.5}'
-### Delete a room
+  -H "Content-Type: application/json" \
+  -d '{"value":24.3}'
+```
 
+### 8 — Get Reading History
+
+```bash
+curl -X GET http://localhost:8080/api/v1/sensors/TEMP-001/readings
+```
+
+### 9 — Attempt to delete Room with active Sensors → 409
+
+```bash
 curl -X DELETE http://localhost:8080/api/v1/rooms/LIB-301
-
----
-## Additional Features
-The following enhancements were implemented:
-
-### Input Validation
-Rooms validated for non-empty name and capacity > 0
-Sensors validated for valid type and roomId
-
-### Structured Error Handling
-Introduced a dedicated ErrorResponse model
-All errors return consistent JSON format:
-{
-  "status": 400,
-  "error": "Bad Request",
-  "message": "Invalid input",
-  "timestamp": 1713200000000
-}
-### RESTful Best Practices
-POST returns 201 Created + Location header
-DELETE returns 204 No Content
-
-### Advanced Filtering (Bonus Feature)
-Supports:
-GET /sensors?type=CO2
-GET /sensors?status=ACTIVE
-GET /sensors?type=CO2&status=ACTIVE
-Case-insensitive filtering implemented
-
-### Logging Filter
-Logs:
-HTTP method
-Request URI
-Response status
-Response time (ms)
-
-### HATEOAS Discovery Endpoint
-Root endpoint provides:
-API links
-Metadata
-System uptime
-
-### Thread-Safe Data Storage
-
-Uses ConcurrentHashMap for safe concurrent operations
-
----
-
-# Report
-
-
-## **Part 1 - Service Architecture & Setup**
-
-### **1.1 JAX-RS Resource Lifecycle & Data Handling**
-Every incoming request generates a new instance of a resource class under the default JAX-RS lifecycle (Per-Request). This means each request is handled independently, and any variables defined within a resource class are not shared across requests.
-
-An alternative lifecycle is the Singleton configuration, where only one instance of a resource handles all requests. While this can improve performance, it introduces risks when multiple threads access shared data concurrently. If not managed carefully, this can lead to data corruption.
-
-In the Smart Campus API, the default Per-Request lifecycle is used for resources such as rooms, sensors, and readings. All actual data is stored in a shared `DataStore` class using `ConcurrentHashMap`. Because this data store is static and thread-safe, it ensures consistent data across all requests regardless of how many resource instances are created.
-
-Unlike a regular `HashMap`, a `ConcurrentHashMap` allows multiple threads to safely access and modify data at the same time. For example, if two users try to add rooms simultaneously, a normal `HashMap` could lead to duplicate or lost data. However, `ConcurrentHashMap` prevents this by using atomic operations such as `putIfAbsent()`.
-
-Overall, even though each request uses a separate resource instance, shared data remains safe and consistent.
-
----
-
-### **1.2 HATEOAS in REST APIs**
-
-HATEOAS (Hypermedia as the Engine of Application State) is a REST principle where API responses include links that help clients discover available actions without relying on external documentation.
-
-In this API, the discovery endpoint acts as the starting point. It provides links to all major resources along with useful metadata such as the number of rooms, sensors, and server uptime. This makes it both a navigation hub and a health check for the system.
-
-There are several benefits to using HATEOAS. Clients do not need to hard-code URLs and can instead follow links dynamically. It also makes the API easier to understand, as developers can explore it without needing separate documentation. Additionally, the API becomes more flexible, as new features can be added simply by including new links without breaking existing clients.
-
-The discovery endpoint also includes metadata such as API version information, contact details, and available endpoints, making the API self-descriptive and aligned with REST best practices.
-
----
-
-## **Part 2 - Room Management**
-
-### **2.1 Returning Full Objects vs IDs**
-
-The `GET /rooms` endpoint can return either only room IDs or full room objects.
-
-Returning only IDs reduces response size and improves bandwidth efficiency. However, it forces the client to make additional requests to retrieve full details for each room, leading to the N+1 problem, where one request results in many follow-up requests.
-
-Returning full objects increases response size but eliminates the need for additional requests. This improves overall performance by reducing latency.
-
-In this API, full room objects are returned because:
-
-* Each room contains only a small amount of data
-* The number of rooms is limited
-* Most use cases require full room details
-
-In larger systems, a hybrid approach such as pagination or field filtering is often used. However, for this system, returning full objects is the most practical solution.
-
----
-
-### **2.2 Idempotency of the DELETE Operation**
-
-An operation is idempotent if performing it multiple times results in the same final state as performing it once.
-
-The `DELETE /rooms/{id}` endpoint follows this principle. The first successful request returns HTTP 204 (No Content). If the same request is repeated, the room no longer exists, and the API returns HTTP 404 (Not Found).
-
-Although the responses differ, the final state remains the same — the room is deleted. Therefore, the operation is idempotent.
-
-If a room still contains sensors, the API returns HTTP 409 (Conflict). Repeating the request will continue to return the same response, maintaining consistent and predictable behaviour.
-
----
-
-## **Part 3 - Sensor Operations**
-
-### **3.1 Content-Type Handling**
-
-Using `@Consumes(application/json)` ensures that the API only accepts JSON input.
-
-If a client sends data in an unsupported format (such as XML or plain text), the API automatically returns HTTP 415 (Unsupported Media Type) before the request reaches the method.
-
-JAX-RS handles this internally by attempting to find a suitable parser (e.g., Jackson for JSON). If no parser is available, the request is rejected immediately.
-
-This prevents invalid data from reaching the business logic layer and provides clear feedback to the client.
-
----
-
-### **3.2 Query vs Path Parameters for Filtering**
-
-Filtering sensors can be implemented using:
-
-* Query parameters: `/sensors?type=CO2`
-* Path parameters: `/sensors/type/CO2`
-
-Query parameters are preferred because they clearly represent filtering of a collection rather than accessing a separate resource. They are also optional, allowing `/sensors` to return all results and `/sensors?type=CO2` to return filtered results.
-
-They also support combining multiple filters, such as:
-
 ```
+
+### 10 — Register Sensor with bad roomId → 422
+
+```bash
+curl -X POST http://localhost:8080/api/v1/sensors \
+  -H "Content-Type: application/json" \
+  -d '{"id":"TEMP-999","type":"Temperature","status":"ACTIVE","currentValue":0.0,"roomId":"GHOST-000"}'
+```
+
+---
+
+## Error Handling
+
+| Scenario | HTTP Code |
+|----------|-----------|
+| Room or sensor not found | 404 Not Found |
+| Missing or invalid request field | 400 Bad Request |
+| Duplicate ID on POST | 409 Conflict |
+| DELETE room that still has sensors | 409 Conflict |
+| Sensor roomId does not exist | 422 Unprocessable Entity |
+| POST reading to MAINTENANCE sensor | 403 Forbidden |
+| Any unexpected server error | 500 Internal Server Error |
+
+All errors return a consistent JSON body — **no raw Java stack traces are ever exposed to the client**.
+
+---
+
+## Extra Features
+
+| Feature | Description |
+|---------|-------------|
+| **`ErrorResponse` model** | All exception mappers use a shared POJO with `status`, `error`, `message`, `timestamp` |
+| **`201 Created` + Location header** | POST /rooms and POST /sensors both return a `Location` header pointing to the new resource |
+| **`204 No Content` on DELETE** | Correct REST semantics — no body on successful deletion |
+| **Input validation on POST** | Rooms: validates `id`, `name`, `capacity > 0`. Sensors: validates `id`, `type`, `roomId` |
+| **Dual filter on GET /sensors** | Supports `?type=` and `?status=` together or separately, both case-insensitive |
+| **Response-time logging** | Filter records start time on request and logs elapsed milliseconds on response |
+| **HATEOAS `_links` + live stats** | Discovery returns navigable `_links`, live room/sensor counts, and `uptimeMs` |
+| **Sensor count in 409 error** | `RoomNotEmptyException` includes the exact number of blocking sensors |
+| **Default sensor status** | If `status` is omitted from POST /sensors, defaults gracefully to `"ACTIVE"` |
+| **PUT /sensors/{id}** | Allows updating sensor status (e.g. MAINTENANCE → ACTIVE)  |
+
+---
+
+## Conceptual Report
+
+---
+
+### Part 1 - Service Architecture & Setup
+
+#### 1.1 JAX-RS Resource Lifecycle & Data Handling
+
+Every incoming request will generate an instance of the resource with the default configuration of JAX-RS (Per-Request). By default, all requests will be processed independently of one another, meaning that any variables defined in a resource class would not be shared with any other requests.
+The second lifecycle you can configure is the singleton. With this configuration, there would only be one instance of a given resource handling all requests. This approach may improve performance, but there are added risks associated with multiple threads accessing the same object concurrently. If such cases aren't handled properly, data could become corrupted.
+For example, the Smart Campus API uses the default (Per-Request) lifecycle for resources such as rooms, sensors, and readings. All real-world data utilized by these resources is stored in a common DataStore class, which uses ConcurrentHashMap to store resources. Since the data store is both static and thread-safe, the contents of the ConcurrentHashMap will be consistent for all requests, no matter how many resource instances were created.
+Unlike a HashMap, a ConcurrentHashMap allows multiple threads to access an object simultaneously without causing problems. A typical issue with two users attempting to add rooms is that the second user may have their add room action denied because of a duplicate entry being created or data being lost. ConcurrentHashMap prevents this by handling operations like putIfAbsent() atomically.
+So overall, even though each request gets a new resource instance, the shared data is safely managed in the background.
+
+#### 1.2 HATEOAS in REST APIs
+
+HATEOAS is a concept that means that through its response, an API should provide clients with links so that they can discover what they need to do next without having to look elsewhere for documentation.
+In this API, the discovery endpoint is the primary starting point, returning links to all of the major resources, as well as other useful information such as the number of rooms, sensors, and server uptime. As such, the discovery endpoint can be thought of as both a navigation tool and a quick check on the health of the system.
+There are many benefits to using HATEOAS. First, clients do not need to hard-code URLs; they only need to follow the links that are provided. Secondly, it simplifies the understanding of how the API works because developers can dynamically navigate through the API. Thirdly, since the API can be enhanced independently of clients, when new functionality is added, it can simply be added as a link without breaking existing clients.
+As a result, using HATEOAS provides the API with greater flexibility and self-explanatory capabilities and is easier for developers to maintain.
+In addition to navigation links, the discovery endpoint also includes important metadata such as API version information, administrative or contact details, and a structured list of available resource endpoints. This makes the API more self-descriptive and aligns with best practices in RESTful design.
+
+### Part 2 - Room Management
+
+#### 2.1 Returning Full Objects vs IDs
+
+The GET /rooms API has two ways to return data - by returning just the room id or full room details.
+If only returning ids, it reduces the response size and is better for performance; however, it requires the client to make additional requests in order to retrieve information about each room (N+1 problem - the original request creates many requests), increasing the overall response time.
+If returning the full object (data), it eliminates the N+1 issue due to the fact that all needed values will be returned to the client immediately, saving time even though the response would be larger than if just the id were returned.
+In this API, full room objects are returned. This is because:
+•	The data is small (only a few fields per room) 
+•	The number of rooms is limited 
+•	Most use cases (like dashboards) need all the information anyway
+
+In larger systems, a mixed approach is often used, such as pagination or allowing clients to request specific fields. But for this case, returning full objects is the most practical choice.
+
+#### 2.2 Idempotency of the DELETE operation
+
+A method or function is considered idempotent when applying it several times will not change the result of applying it only once.
+The DELETE API request for deleting a room follows that definition as well. If you make a successful request to DELETE /rooms/{id}, the response will be HTTP 204 No Content; however, if you were to make that request again, the room would not exist and the response will be HTTP 404 Not Found.
+
+Even though the two responses are different (one indicating success and the other failure), the final result for both is the same. The room was deleted. Therefore, the DELETE /rooms/{id} function continues to be considered idempotent.
+Furthermore, when attempting to delete a room that has sensors, the DELETE /rooms/{id} API request returns an HTTP 409 Conflict error. If you were to continue to make the same DELETE API request until successful, the response will continue to be the same with an HTTP 409 Conflict error response; therefore, the DELETE /rooms/{id} API request continues to yield a consistent and predictable behaviour regardless of the outcome of the initial DELETE request.
+
+### Part 3 -  Sensor Operations
+
+#### 3.1 Technical Consequences of Content-Type Mismatches with @Consumes
+
+When you decorate a POST endpoint with the @Consumes(MediaType.APPLICATION_JSON) annotation, you are telling JAX-RS that only application/json formatted request bodies are acceptable when an HTTP POST request gets sent to that endpoint. If an HTTP request was sent with an invalid Content-Type (such as text/plain or application/xml), JAX-RS automatically sends the client a response with the HTTP status of 415 Unsupported Media Type before the request body reaches either the resource method or the business logic contained within the resource method.
+
+JAX-RS handles all of this at the framework level through the MessageBodyReader selection process. When a request arrives at your REST service, JAX-RS checks the Content-Type header and iterates over each of the available MessageBodyReader implementations to determine if any of them support deserialising that Content-Type into the appropriate Java type (in our case, a Sensor object using the Jackson JSON provider). If no valid MessageBodyReader exists to support that format (this would occur if there were no registered XML readers), JAX-RS immediately responds to the client with a response code of 415 before the resource method is ever invoked.
+Two key advantages of using this approach are: 1) That the framework can intercept and reject any invalid input data formats before any unwanted input data reach your service logic, thus freeing you from writing any defensive code within your resource method; and 2) That the error returned to the client will use an HTTP status code of 415 (Unsupported Media Type) to clearly indicate to the client that a media-type mismatch caused the error, allowing clients to quickly identify and remedy their implementation issues.
+3.2 Query vs Path Parameters for filtering
+Filtering sensors can be done in two ways:
+•	Query parameter: /sensors?type=CO2 
+•	Path parameter: /sensors/type/CO2 
+
+Query parameters are the better choice here.
+They clearly indicate that we are filtering a collection, not accessing a separate resource. They are also optional, so /sensors can return all sensors, while /sensors?type=CO2 returns only filtered results.
+They also make it easier to combine filters, like:
 /sensors?type=CO2&status=ACTIVE
-```
+Using path parameters for this would be messy and harder to manage.
+Because of this, query parameters are the standard approach used in most APIs.
 
-Using path parameters for filtering would be less flexible and harder to manage. Therefore, query parameters are the standard approach.
+### Part 4 - Sub-Resources
 
----
+#### 4.1 Sub-Resource Locator Pattern
 
-## **Part 4 - Sub-Resources**
+The Sub-Resource Locator pattern is a way to organize API code such that nested paths are routed to separate, dedicated classes rather than having everything routed through one large controller. For the example of this API, there is no one class that directly handles everything related to the readings from a sensor. Instead, there is a class called SensorResource that delegates the path /{sensorId}/readings to a second class called SensorReadingResource via a locator function annotated with @Path but does not specify how the path is accessed with either a GET or a POST.
+The primary advantage of using this pattern is the separation of concerns within your codebase, or more specifically, within the classes you have created. The responsibilities of the classes in this example are:
+SensorResource: Responsible for any type of operation related to sensors (i.e., creating, retrieving and filtering sensors). SensorReadingResource: Responsible solely for the management of the history of readings from a specific sensor. 
+The result of this type of design leads to a codebase that is far more understandable, testable, and maintainable than if you had implemented everything through one large controller type class. If all of the content were dumped into one class, it would become extremely unmanageable (potentially containing <100 methods for a class). This violates the Single Responsibility Principle which makes it hard to debug, review and on-board new developers. Using sub-resource locators will help keep classes smaller, focused, and manageable.
+Another benefit is extensibility. Adding nested resources (i.e. /sensors/{id}/alerts) would involve creating a new resource class and adding a new locator method. There is no need to change existing code which reduces the risk of introducing bugs. The pattern also supports contextual initialization. SensorReadingResource receives its sensorId for any working instance via its constructor from the locator method. This ensures that it always works under the context of a specific sensor. As such, validation (e.g. whether or not the sensor exists) can be done once and be applicable to all calling methods.
+Finally, this design and structure of code closely resembles the real-world domain. Sensor readings belong to a specific sensor and do not exist independently of it. By organizing and structuring code in this way it allows more intuitive navigation through the codebase for those (developers) who have experience/knowledge of how the system works.
 
-### **4.1 Sub-Resource Locator Pattern**
+#### 4.2 Managing Sensor Readings
 
-The Sub-Resource Locator pattern allows nested paths to be handled by separate classes instead of a single large controller.
+The SensorReadingResource supports two main operations:
+•	GET → to retrieve the full history of readings for a sensor 
+•	POST → to add a new reading 
+When a new reading is added using POST, the server automatically:
+•	Generates a UUID for the reading ID 
+•	Records the timestamp (in milliseconds) on the server side 
+The client only needs to send the reading value. This design ensures that:
+•	All reading IDs are unique 
+•	Timestamps are consistent and reliable (since they come from the server, not the client) 
+An important side effect of adding a new reading is that the parent Sensor object is also updated. After storing the new SensorReading, the API retrieves the corresponding sensor from the DataStore and updates its currentValue field with the new reading’s value.
+This is done to maintain data consistency. As a result, when a client calls GET /sensors/{sensorId}, they immediately see the latest reading in the currentValue field, without needing to go through the entire history of readings.
 
-In this API, `SensorResource` delegates the path `/{sensorId}/readings` to `SensorReadingResource` using a locator method annotated with `@Path`.
+### Part 5 - Error Handling & Security
 
-This approach improves separation of concerns:
+#### 5.1 Why HTTP 422 is More Semantically Accurate than 404
 
-* `SensorResource` handles sensor-related operations
-* `SensorReadingResource` manages sensor readings
+When a client POST's a new sensor with a roomId that isn't found in the system, returning a 404 Not Found response is semantically incorrect. A 404 response conventionally indicates that the resource referenced by the request URI, in this case /api/v1/sensors, cannot be found. Since the /sensors endpoint exists and can process requests, there is nothing wrong with the URI.
+The problem lies entirely within the request payload. The JSON body is semantically valid; the Content-Type header is correct; and the body matches the Sensor model structure. However, the roomId field is referencing a resource that does not exist in the system. Because of this, the validation failure at the semantic level is a failure in semantics and not in format (which would produce a 400 Bad Request) and is also not a failure due to a missing endpoint (which would result in a 404).
+The HTTP error code 422 Unprocessable Entity refers specifically to this type of situation; it indicates that the server received both the entire request in an acceptable format and was able to parse it, but is unable to comply with the instructions contained within because the data is logically invalid. To a client, an error code of 422 is extremely unambiguous because, as far as the client knows, they sent the server a request that is valid both in structure and logic. In other words, the client should revisit the referenced roomId for valid data since the structure is already correct. The additional information from the server about what went wrong, such as 'correct your roomId' rather than finding a new endpoint (404) or determining new content-types or URL formats, can make a significant difference in assisting a client to correct their error and successfully communicate with the server. For example, a 404 may cause a client to attempt to use a different endpoint where as 422 signals that the client must first create the room referenced by the roomId before attempting to register a sensor with the server.
 
-This keeps the codebase clean, easier to maintain, and easier to test. Without this pattern, a single class could become very large and difficult to manage, violating the Single Responsibility Principle.
+#### 5.2 Risks of Exposing Stack Traces
 
-It also improves extensibility. New nested resources (e.g., `/sensors/{id}/alerts`) can be added without modifying existing code.
+Java stack traces help with debugging in development, but showing them in API responses can create serious security risks.
+A stack trace might give away sensitive internal details like:
+•	Class and package names (e.g., com.smartcampus.resource.SensorResource)  
+•	Framework and library versions (like Jersey)  
+•	File paths and exact line numbers for errors  
+•	Specific exception types (e.g., NullPointerException)  
+This info can be used by attackers to get a clearer picture of the system’s internal setup and spot possible weaknesses. For instance, they could match library versions against known security issues (found in CVE databases) or design specific inputs to exploit flaws in the code.
+To avoid this, the API uses a global exception handler with ExceptionMapper<Throwable>. This serves as a safety net, catching all unhandled exceptions, including runtime errors.
+Instead of providing detailed error info, the API sends back a generic HTTP 500 Internal Server Error message that keeps any internal details hidden. Meanwhile, the complete exception data, including the stack trace, is logged internally using java.util.logging.Logger at the SEVERE level.
+This follows a key security principle: log everything internally, but don’t expose anything sensitive to the client.
 
-Additionally, `SensorReadingResource` receives the `sensorId` through its constructor, ensuring it always operates within the correct context. This avoids repeated validation across methods.
+#### 5.3 - Benefits of JAX-RS Filters for Cross-Cutting Concerns
 
-Finally, this structure reflects the real-world relationship where readings belong to a specific sensor, making the system intuitive to understand.
+Cross-cutting concerns are those capabilities that are needed throughout most, if not all, parts of an application. Logging, authentication, rate limiting, CORS header injection, and request validation are some high level examples of common cross-cutting concerns. As cross-cutting concerns go across the boundaries of individual modules, they cannot be easily encapsulated by a single class (which would maintain the encapsulation).
 
----
+Implementing cross-cutting concerns directly in resource methods creates two significant problems. First, it violates the DRY (Do Not Repeat Yourself) principle because if logging needs to be added to every resource method, a change to the logging format will require updating dozens of methods; Additionally, when a developer creates a new endpoint, he/she/they will have to remember to manually add in the logging code , making the overall system both fragile and inconsistent. Second, it violates the Single Responsibility Principle because resource methods whose responsibility is to perform business logic (e.g., create a sensor; delete a room) should not also be responsible for providing operational observability.JAX-RS offers a way of applying behaviour to the JAX-RS framework where this behaviour occurs before and after resource method invocation without modifying the resource methods at all. The LoggingFilter class in this API implements both ContainerRequestFilter and ContainerResponseFilter in a single @Provider annotated class. Since this filter is registered as a @Provider, JAX-RS will automatically apply it to every incoming request and every outgoing response by logging the HTTP method, full request URI, response status code, and the time it took to produce the response in milliseconds without requiring changes to the resource classes.
 
-### **4.2 Managing Sensor Readings**
-
-The `SensorReadingResource` supports:
-
-* **GET** → retrieve all readings for a sensor
-* **POST** → add a new reading
-
-When a reading is added:
-
-* A UUID is generated for the reading ID
-* A timestamp is recorded on the server
-
-The client only provides the value, ensuring consistency and reliability.
-
-After storing the reading, the parent sensor’s `currentValue` field is updated. This ensures that clients retrieving sensor data always see the latest value without needing to check the full history.
-
----
-
-## **Part 5 - Error Handling & Security**
-
-### **5.1 Why 422 Instead of 404**
-
-Returning HTTP 404 would be incorrect when a sensor is created with an invalid `roomId`, as the `/sensors` endpoint exists.
-
-Instead, HTTP 422 (Unprocessable Entity) is used because the request is valid in structure but contains invalid data.
-
-This clearly indicates a semantic validation error and helps developers understand that the issue lies in the request data, not the endpoint.
-
----
-
-### **5.2 Risks of Exposing Stack Traces**
-
-Exposing stack traces in API responses is a security risk. They can reveal:
-
-* Internal class and package names
-* Framework and library versions
-* File paths and line numbers
-* Exception types
-
-Attackers can use this information to identify vulnerabilities.
-
-To prevent this, a global exception handler (`ExceptionMapper<Throwable>`) returns a generic HTTP 500 response while logging full details internally using `java.util.logging.Logger`.
-
-This follows the principle: **log everything internally, expose nothing externally.**
-
----
-
-### **5.3 JAX-RS Filters for Cross-Cutting Concerns**
-
-Cross-cutting concerns such as logging, authentication, and rate limiting affect multiple parts of the application.
-
-Implementing them inside resource methods leads to code duplication and poor maintainability.
-
-Instead, this API uses JAX-RS filters. A `LoggingFilter` implements both:
-
-* `ContainerRequestFilter`
-* `ContainerResponseFilter`
-
-It automatically logs:
-
-* HTTP method
-* Request URI
-* Response status
-* Processing time
-
-This keeps business logic clean and ensures consistent logging.
-
-Filters can also be combined, prioritised, and selectively applied using `@Priority` and `@NameBinding`, making them highly flexible.
-
----
+Filters support further advanced features through composability. Filters can be chained together and prioritised using the @Priority annotation to control execution order and filter instances can be selectively applied to endpoints with the use of the @NameBinding annotation. For example, an authentication filter can be bound to secured endpoints without modifying the implementation of those endpoints. Therefore, filters are ideal architectural constructs that promote consistent behaviour across all endpoints of the API, while maintaining the focus of resource classes on business logic only.
