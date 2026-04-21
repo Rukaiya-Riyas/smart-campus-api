@@ -76,4 +76,12 @@ public class RoomResource {
         DataStore.rooms.remove(roomId);
         return Response.noContent().build();
     }
+
+    @GET
+    @Path("/crash")
+    public Response triggerCrash() {
+        String s = null;
+        s.length();
+        return Response.ok().build();
+    }
 }
