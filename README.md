@@ -147,7 +147,7 @@ target/smart-campus-api-1.0-SNAPSHOT-shaded.jar
 ### Step 3 - Start the server
 
 ```bash
-java -jar target/smart-campus-api-1.0-SNAPSHOT-shaded.jar
+java -jar target/smart-campus-api-1.0-SNAPSHOT.jar
 ```
 
 Expected console output:
