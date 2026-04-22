@@ -3,7 +3,7 @@
 > **Module:** 5COSC022W – Client-Server Architectures | **University of Westminster**
 > **Technology Stack:** Java 11 · JAX-RS (Jersey 2.41) · Grizzly Embedded HTTP Server · Maven
 
-A robust RESTful API for managing Rooms and Sensors across a university Smart Campus. Built entirely with JAX-RS - no Spring Boot, no external database.
+A robust RESTful API for managing Rooms and Sensors across a university Smart Campus. Built entirely with JAX-RS.
 
 ---
 
@@ -296,7 +296,7 @@ All errors return a consistent JSON body — **no raw Java stack traces are ever
 
 ---
 
-## Extra Features Beyond Specification
+## Extra Features
 
 | Feature | Description |
 |---------|-------------|
