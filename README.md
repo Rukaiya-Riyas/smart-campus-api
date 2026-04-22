@@ -447,6 +447,7 @@ They also make it easier to combine filters, like:
 /sensors?type=CO2&status=ACTIVE
 Using path parameters for this would be messy and harder to manage.
 Because of this, query parameters are the standard approach used in most APIs.
+
 ---
 
 ### Part 4 - Sub-Resources
